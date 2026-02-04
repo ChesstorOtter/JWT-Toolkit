@@ -16,13 +16,16 @@ func NoneAtack(tokenString string, newPayload map[string]interface{}) {
 	fmt.Println("New token with 'none' algorithm:")
 	fmt.Println(newToken)
 
-	if payload, ok := newPayload["payload"]; ok {
-		fmt.Println("New Payload:")
-		jsonbytes, err := json.MarshalIndent(payload, "", "  ")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error formatting JSON: %v\n", err)
-			return
-		}
-		fmt.Println(string(jsonbytes))
+	parsed, err := jwt.ParseToken(newToken)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing new token payload: %v\n", err)
+		return
 	}
+	jsonbytes, err := json.MarshalIndent(parsed.Payload, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error formatting JSON: %v\n", err)
+		return
+	}
+	fmt.Println("New Payload:")
+	fmt.Println(string(jsonbytes))
 }

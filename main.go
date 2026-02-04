@@ -88,8 +88,45 @@ func main() {
 		}
 		cmd.ConfusionAtack(tokenString, newPayload, publicKeyPath)
 
+	case "attack-none":
+		if len(os.Args) < 5 {
+			fmt.Println("Usage: jwttool attack-none <token> <target> <endpoint> [proxy] [insecure:true|false]")
+			return
+		}
+		tokenString := os.Args[2]
+		target := os.Args[3]
+		endpoint := os.Args[4]
+		proxy := ""
+		insecure := false
+		if len(os.Args) >= 6 {
+			proxy = os.Args[5]
+		}
+		if len(os.Args) >= 7 {
+			insecure = os.Args[6] == "true"
+		}
+		cmd.AttackNone(tokenString, target, endpoint, proxy, insecure)
+
+	case "attack-crack":
+		if len(os.Args) < 6 {
+			fmt.Println("Usage: jwttool attack-crack <token> <wordlist> <target> <endpoint> [proxy] [insecure:true|false]")
+			return
+		}
+		tokenString := os.Args[2]
+		wordlistPath := os.Args[3]
+		target := os.Args[4]
+		endpoint := os.Args[5]
+		proxy := ""
+		insecure := false
+		if len(os.Args) >= 7 {
+			proxy = os.Args[6]
+		}
+		if len(os.Args) >= 8 {
+			insecure = os.Args[7] == "true"
+		}
+		cmd.AttackCrack(tokenString, wordlistPath, target, endpoint, proxy, insecure)
+
 	default:
 		fmt.Println("Unknown command:", command)
-		fmt.Println("Available commands: decode, verify, crack, none, confusion")
+		fmt.Println("Available commands: decode, verify, crack, none, confusion, attack-none, attack-crack")
 	}
 }

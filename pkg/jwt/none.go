@@ -24,7 +24,7 @@ func NoneAtack(tokenString string, newPayload map[string]interface{}) (string, e
 		return "", fmt.Errorf("failed to marshal header: %v", err)
 	}
 
-	payloadBytes, err := json.Marshal(newPayload)
+	payloadBytes, err := json.Marshal(token.Payload)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal payload: %v", err)
 	}

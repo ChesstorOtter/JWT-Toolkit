@@ -7,5 +7,10 @@ import (
 
 func CrackToken(tokenString string, wordlistPath string) {
 	fmt.Println("Starting token cracking...")
-	jwt.CrackHS256(tokenString, wordlistPath)
+	secret, err := jwt.CrackHS256(tokenString, wordlistPath)
+	if err != nil {
+		fmt.Printf("Crack finished: %v\n", err)
+		return
+	}
+	fmt.Printf("Crack finished: secret=%q\n", secret)
 }
